@@ -1,0 +1,103 @@
+# ZeroClaw Devfile — Web Terminal (No IDE)
+#
+# ZeroClaw is a Rust-based AI agent gateway/runtime.
+# Repo: https://github.com/zeroclaw-labs/zeroclaw
+#
+# Two-container architecture:
+#   1. zeroclaw — runs the daemon, mounts the shared config volume
+#   2. zeroclaw-terminal — ttyd web terminal (injected by .che/che-editor.yaml),
+#      same image so the zeroclaw CLI is available for `zeroclaw onboard`
+#
+# The .che/che-editor.yaml file tells Eclipse Che to use ttyd as the
+# editor instead of VS Code. The Dashboard opens the ttyd web terminal
+# where the user can run zeroclaw CLI commands.
+#
+# The zeroclaw web UI is accessible via its own Route (deployByDefault).
+# Do NOT apply the Service/Route manually beforehand — DWO creates
+# them as cluster resources.
+
+schemaVersion: 2.3.0
+metadata:
+  name: zeroclaw-terminal
+
+attributes:
+  controller.devfile.io/storage-type: per-workspace
+
+components:
+  # Service with a fixed name so the Route can reference it.
+  # DWO applies this as a cluster resource (not a pod container).
+  - name: zeroclaw-service
+    kubernetes:
+      deployByDefault: true
+      inlined: |
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: zeroclaw-terminal
+        spec:
+          selector:
+            controller.devfile.io/devworkspace_name: zeroclaw-terminal
+          ports:
+            - name: gateway
+              port: 42617
+              targetPort: 42617
+
+  # Route for the zeroclaw web UI. Applied on OpenShift only.
+  # DWO applies this as a cluster resource, independent of routingClass.
+  - name: zeroclaw-route
+    openshift:
+      deployByDefault: true
+      inlined: |
+        apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          name: zeroclaw-terminal
+        spec:
+          to:
+            kind: Service
+            name: zeroclaw-terminal
+          port:
+            targetPort: gateway
+          tls:
+            termination: edge
+            insecureEdgeTerminationPolicy: Redirect
+
+  # Daemon container: runs zeroclaw daemon.
+  # The startup script patches config if it exists (zeroclaw onboard
+  # resets host to 127.0.0.1 which would break the Route).
+  # The zeroclaw-terminal container (from .che/che-editor.yaml) shares
+  # the zeroclaw-config volume, so changes from `zeroclaw onboard` are
+  # visible here after a pod restart.
+  - name: zeroclaw
+    container:
+      image: quay.io/okurinny/zeroclaw-full:v0.1.7
+      mountSources: false
+      memoryRequest: 256Mi
+      memoryLimit: 1Gi
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace
+          if [ -f /zeroclaw-data/.zeroclaw/config.toml ]; then
+            sed -i 's/^host = .*/host = "[::]"/' /zeroclaw-data/.zeroclaw/config.toml
+            sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' /zeroclaw-data/.zeroclaw/config.toml
+          fi
+          exec zeroclaw daemon
+      endpoints:
+        - name: gateway
+          targetPort: 42617
+          exposure: internal
+          protocol: http
+      volumeMounts:
+        - name: zeroclaw-workspace
+          path: /zeroclaw-data/workspace
+        - name: zeroclaw-config
+          path: /zeroclaw-data/.zeroclaw
+
+  - name: zeroclaw-workspace
+    volume:
+      size: 1Gi
+
+  - name: zeroclaw-config
+    volume:
+      size: 256Mi
