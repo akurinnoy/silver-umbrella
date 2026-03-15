@@ -9,7 +9,7 @@ Single container running both processes:
 - **ttyd** (foreground) — web terminal on port 7681, serves the browser shell
 - **zeroclaw daemon** (background) — gateway, channels, scheduler on port 42617
 
-The `.che/che-editor.yaml` prevents Eclipse Che from injecting VS Code. The Dashboard opens the ttyd web terminal where you can run zeroclaw CLI commands and manage the daemon directly.
+The `.che/che-editor.yaml` prevents Eclipse Che from injecting VS Code. The Dashboard opens the ttyd web terminal where you can run zeroclaw CLI commands.
 
 ## Quick Start
 
@@ -33,15 +33,9 @@ zeroclaw onboard --api-key <your-key> --provider openrouter
 zeroclaw onboard
 ```
 
-### 3. Apply the configuration
+### 3. Restart the workspace
 
-Restart the daemon to pick up the new config:
-
-```sh
-zeroclaw-restart
-```
-
-This patches the config (fixes host binding for the Route), stops the old daemon, and starts a new one — all within the same container. No pod restart needed.
+The daemon reads config only at startup. Restart the workspace from the Che Dashboard to apply the new configuration. The startup script automatically patches the config (fixes host binding for the Route) and starts the daemon.
 
 ### 4. Access the zeroclaw web UI
 
@@ -68,7 +62,6 @@ The web terminal includes:
 | Tool | Usage |
 |------|-------|
 | `zeroclaw` | CLI — `onboard`, `daemon`, `agent`, `status`, etc. |
-| `zeroclaw-restart` | Restart the daemon after config changes |
 | `vi` | Text editor (vim-tiny) |
 | `mc` | Midnight Commander file manager |
 | `curl`, `git` | Standard tools |
@@ -95,9 +88,10 @@ Update the `image:` field in `devfile.yaml` if using a different registry.
 
 ## Reset Pairing
 
+Delete `config.toml` in the web terminal, then restart the workspace from the Dashboard:
+
 ```sh
 rm /zeroclaw-data/.zeroclaw/config.toml
-zeroclaw-restart
 ```
 
 The daemon generates a fresh config and pairing code on next start.

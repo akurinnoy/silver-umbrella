@@ -61,29 +61,6 @@ RUN set -eux; \
         -o /usr/local/bin/ttyd; \
     chmod +x /usr/local/bin/ttyd
 
-# Script to restart the zeroclaw daemon after config changes (e.g. after
-# running `zeroclaw onboard`). Patches config, kills the old daemon, and
-# starts a new one in the background.
-COPY <<'SCRIPT' /usr/local/bin/zeroclaw-restart
-#!/bin/bash
-CONFIG=/zeroclaw-data/.zeroclaw/config.toml
-
-if [ -f "$CONFIG" ]; then
-  echo "Patching config..."
-  sed -i 's/^host = .*/host = "[::]"/' "$CONFIG"
-  sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' "$CONFIG"
-fi
-
-echo "Stopping daemon..."
-pkill -f "zeroclaw daemon" 2>/dev/null
-sleep 1
-
-echo "Starting daemon..."
-zeroclaw daemon &
-echo "Daemon restarted (PID $!)"
-SCRIPT
-RUN chmod +x /usr/local/bin/zeroclaw-restart
-
 # zeroclaw writes all state to $HOME/.zeroclaw. In the DevWorkspace the PVC
 # is mounted at /zeroclaw-data, so setting HOME there means config, pairing
 # tokens, and daemon state all persist across pod restarts.
