@@ -3,14 +3,10 @@
 # ZeroClaw is a Rust-based AI agent gateway/runtime.
 # Repo: https://github.com/zeroclaw-labs/zeroclaw
 #
-# Two-container architecture:
-#   1. zeroclaw — runs the daemon, mounts the shared config volume
-#   2. zeroclaw-terminal — ttyd web terminal (injected by .che/che-editor.yaml),
-#      same image so the zeroclaw CLI is available for `zeroclaw onboard`
-#
-# The .che/che-editor.yaml file tells Eclipse Che to use ttyd as the
-# editor instead of VS Code. The Dashboard opens the ttyd web terminal
-# where the user can run zeroclaw CLI commands.
+# Single container running both ttyd (web terminal) and zeroclaw daemon.
+# The .che/che-editor.yaml prevents Eclipse Che from injecting VS Code.
+# The Dashboard opens the ttyd web terminal where users can run
+# zeroclaw CLI commands and manage the daemon directly.
 #
 # The zeroclaw web UI is accessible via its own Route (deployByDefault).
 # Do NOT apply the Service/Route manually beforehand — DWO creates
@@ -62,12 +58,10 @@ components:
             termination: edge
             insecureEdgeTerminationPolicy: Redirect
 
-  # Daemon container: runs zeroclaw daemon.
-  # The startup script patches config if it exists (zeroclaw onboard
-  # resets host to 127.0.0.1 which would break the Route).
-  # The zeroclaw-terminal container (from .che/che-editor.yaml) shares
-  # the zeroclaw-config volume, so changes from `zeroclaw onboard` are
-  # visible here after a pod restart.
+  # Single container: ttyd (foreground) + zeroclaw daemon (background).
+  # The startup script patches config, starts the daemon, then runs ttyd.
+  # Users interact via the browser terminal — run `zeroclaw onboard` to
+  # configure, then `zeroclaw-restart` to apply changes to the daemon.
   - name: zeroclaw
     container:
       image: quay.io/okurinny/zeroclaw-full:v0.1.7
@@ -82,12 +76,22 @@ components:
             sed -i 's/^host = .*/host = "[::]"/' /zeroclaw-data/.zeroclaw/config.toml
             sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' /zeroclaw-data/.zeroclaw/config.toml
           fi
-          exec zeroclaw daemon
+          zeroclaw daemon &
+          exec ttyd -W bash
       endpoints:
         - name: gateway
           targetPort: 42617
           exposure: internal
           protocol: http
+        - name: terminal
+          targetPort: 7681
+          exposure: public
+          protocol: https
+          attributes:
+            type: main
+            cookiesAuthEnabled: true
+            discoverable: false
+            urlRewriteSupported: true
       volumeMounts:
         - name: zeroclaw-workspace
           path: /zeroclaw-data/workspace

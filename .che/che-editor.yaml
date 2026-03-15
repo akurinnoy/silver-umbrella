@@ -1,38 +1,7 @@
-# Web terminal editor for Eclipse Che.
-#
-# Replaces the default VS Code editor with ttyd — a lightweight web
-# terminal that serves a browser-based shell on port 7681. Uses the
-# same zeroclaw-full image as the daemon container, so the zeroclaw
-# CLI is available for running `zeroclaw onboard` and other commands.
-#
-# The shared zeroclaw-config volume lets the terminal and daemon
-# containers access the same config.toml.
+# Minimal editor definition — prevents Eclipse Che from injecting VS Code.
+# The devfile's own container provides the ttyd web terminal (type: main).
 
 inline:
   schemaVersion: 2.1.0
   metadata:
-    name: che-terminal
-  components:
-    - name: zeroclaw-terminal
-      container:
-        image: quay.io/okurinny/zeroclaw-full:v0.1.7
-        command: ["ttyd", "-W", "bash"]
-        mountSources: false
-        memoryRequest: 64Mi
-        memoryLimit: 256Mi
-        endpoints:
-          - name: terminal
-            targetPort: 7681
-            exposure: public
-            protocol: https
-            attributes:
-              type: main
-              cookiesAuthEnabled: true
-              discoverable: false
-              urlRewriteSupported: true
-        volumeMounts:
-          - name: zeroclaw-config
-            path: /zeroclaw-data/.zeroclaw
-    - name: zeroclaw-config
-      volume:
-        size: 256Mi
+    name: empty-editor
