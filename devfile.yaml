@@ -3,10 +3,10 @@
 # ZeroClaw is a Rust-based AI agent gateway/runtime.
 # Repo: https://github.com/zeroclaw-labs/zeroclaw
 #
-# Single container running both ttyd (web terminal) and zeroclaw daemon.
-# The .che/che-editor.yaml prevents Eclipse Che from injecting VS Code.
-# The Dashboard opens the ttyd web terminal where users can run
-# zeroclaw CLI commands and manage the daemon directly.
+# The zeroclaw daemon runs in its own container. The ttyd web terminal
+# is injected via .che/che-editor.yaml as a container contribution
+# (following the che-code editor pattern). After DWO merges the
+# contribution, ttyd runs inside the same container as the daemon.
 #
 # The zeroclaw web UI is accessible via its own Route (deployByDefault).
 # Do NOT apply the Service/Route manually beforehand — DWO creates
@@ -58,10 +58,11 @@ components:
             termination: edge
             insecureEdgeTerminationPolicy: Redirect
 
-  # Single container: ttyd (foreground) + zeroclaw daemon (background).
-  # The startup script patches config, starts the daemon, then runs ttyd.
+  # Zeroclaw daemon container.
+  # The ttyd web terminal is injected via .che/che-editor.yaml as a
+  # container contribution (following the che-code editor pattern).
   # Users interact via the browser terminal — run `zeroclaw onboard` to
-  # configure, then `zeroclaw-restart` to apply changes to the daemon.
+  # configure, then use Dashboard restart to apply changes to the daemon.
   - name: zeroclaw
     container:
       image: quay.io/okurinny/zeroclaw-full:v0.1.7
@@ -76,22 +77,12 @@ components:
             sed -i 's/^host = .*/host = "[::]"/' /zeroclaw-data/.zeroclaw/config.toml
             sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' /zeroclaw-data/.zeroclaw/config.toml
           fi
-          zeroclaw daemon &
-          exec ttyd -W bash
+          exec zeroclaw daemon
       endpoints:
         - name: gateway
           targetPort: 42617
           exposure: internal
           protocol: http
-        - name: terminal
-          targetPort: 7681
-          exposure: public
-          protocol: https
-          attributes:
-            type: main
-            cookiesAuthEnabled: true
-            discoverable: false
-            urlRewriteSupported: true
       volumeMounts:
         - name: zeroclaw-workspace
           path: /zeroclaw-data/workspace

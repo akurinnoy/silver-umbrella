@@ -46,21 +46,6 @@ RUN set -eux; \
         | tar -xz -C /usr/local/bin; \
     chmod +x /usr/local/bin/zeroclaw
 
-# Install ttyd — a lightweight web terminal that serves a browser-based
-# shell on port 7681. Used by the zeroclaw-terminal devfile variant to
-# give users browser access to the zeroclaw CLI.
-ARG TTYD_VERSION=1.7.7
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) TTYD_ARCH="x86_64" ;; \
-        arm64) TTYD_ARCH="aarch64" ;; \
-        *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
-    esac; \
-    curl -fsSL \
-        "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" \
-        -o /usr/local/bin/ttyd; \
-    chmod +x /usr/local/bin/ttyd
-
 # zeroclaw writes all state to $HOME/.zeroclaw. In the DevWorkspace the PVC
 # is mounted at /zeroclaw-data, so setting HOME there means config, pairing
 # tokens, and daemon state all persist across pod restarts.

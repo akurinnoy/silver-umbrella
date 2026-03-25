@@ -1,7 +1,65 @@
-# Minimal editor definition — prevents Eclipse Che from injecting VS Code.
-# The devfile's own container provides the ttyd web terminal (type: main).
+# ttyd web terminal editor definition.
+#
+# Follows the che-code pattern:
+#   1. preStart init container copies the ttyd binary into a shared volume
+#   2. container-contribution merges the volume mount and endpoint into
+#      the devfile's first container
+#   3. postStart launches ttyd inside the merged container
 
 inline:
   schemaVersion: 2.1.0
   metadata:
-    name: empty-editor
+    name: ttyd-editor
+  commands:
+    - id: init-ttyd-command
+      apply:
+        component: ttyd-injector
+    - id: start-ttyd-command
+      exec:
+        component: ttyd-runtime
+        commandLine: nohup /ttyd-vol/ttyd -W bash > /tmp/ttyd.log 2>&1 &
+  events:
+    preStart:
+      - init-ttyd-command
+    postStart:
+      - start-ttyd-command
+  components:
+    - name: ttyd-injector
+      container:
+        image: docker.io/tsl0922/ttyd:1.7.7-alpine
+        command:
+          - sh
+          - -c
+          - cp /usr/bin/ttyd /ttyd-vol/ttyd && chmod +x /ttyd-vol/ttyd
+        volumeMounts:
+          - name: ttyd-volume
+            path: /ttyd-vol
+        memoryLimit: 64Mi
+        memoryRequest: 16Mi
+        cpuLimit: 500m
+        cpuRequest: 30m
+    - name: ttyd-runtime
+      attributes:
+        controller.devfile.io/container-contribution: true
+      container:
+        image: docker.io/tsl0922/ttyd:1.7.7-alpine
+        memoryLimit: 128Mi
+        memoryRequest: 32Mi
+        cpuLimit: 500m
+        cpuRequest: 30m
+        volumeMounts:
+          - name: ttyd-volume
+            path: /ttyd-vol
+        endpoints:
+          - name: ttyd-terminal
+            targetPort: 7681
+            exposure: public
+            protocol: https
+            attributes:
+              type: main
+              cookiesAuthEnabled: true
+              discoverable: false
+              urlRewriteSupported: true
+    - name: ttyd-volume
+      volume:
+        ephemeral: true
