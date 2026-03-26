@@ -17,7 +17,7 @@ inline:
     - id: start-ttyd-command
       exec:
         component: ttyd-runtime
-        commandLine: nohup /ttyd-vol/ttyd -W bash > /tmp/ttyd.log 2>&1 &
+        commandLine: ( /ttyd-vol/ttyd -W bash > /tmp/ttyd.log 2>&1 & )
   events:
     preStart:
       - init-ttyd-command
