@@ -98,6 +98,7 @@ components:
             sed -i 's/^host = .*/host = "[::]"/' "$CFG"
             sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' "$CFG"
           fi
+          /ttyd-vol/ttyd -W bash &
           exec zeroclaw daemon
       endpoints:
         - name: gateway

@@ -1,10 +1,9 @@
 # ttyd web terminal editor definition.
 #
-# Follows the che-code pattern:
-#   1. preStart init container copies the ttyd binary into a shared volume
-#   2. container-contribution merges the volume mount and endpoint into
-#      the devfile's first container
-#   3. postStart launches ttyd inside the merged container
+# The preStart init container copies the ttyd binary into a shared volume.
+# The container-contribution merges the volume mount and endpoint into
+# the devfile's first container. The devfile's startup script is
+# responsible for launching ttyd from /ttyd-vol/ttyd.
 
 inline:
   schemaVersion: 2.1.0
@@ -14,15 +13,9 @@ inline:
     - id: init-ttyd-command
       apply:
         component: ttyd-injector
-    - id: start-ttyd-command
-      exec:
-        component: ttyd-runtime
-        commandLine: ( /ttyd-vol/ttyd -W bash > /tmp/ttyd.log 2>&1 & )
   events:
     preStart:
       - init-ttyd-command
-    postStart:
-      - start-ttyd-command
   components:
     - name: ttyd-injector
       container:
