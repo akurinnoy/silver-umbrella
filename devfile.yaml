@@ -64,9 +64,9 @@ components:
   # Users interact via the browser terminal — run `zeroclaw onboard` to
   # configure, then use Dashboard restart to apply changes to the daemon.
   #
-  # On first boot the seed config (config/seed-config.toml in the repo)
-  # is written via the startup script. Subsequent restarts preserve the
-  # PVC-backed config and only patch gateway bind settings.
+  # On first boot, the daemon runs briefly to generate its default
+  # config, then is stopped so the startup script can patch gateway
+  # and MCP settings before the final start.
   - name: zeroclaw
     container:
       image: quay.io/okurinny/zeroclaw-full:v0.1.7
@@ -79,24 +79,15 @@ components:
           mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace
           CFG=/zeroclaw-data/.zeroclaw/config.toml
           if [ ! -f "$CFG" ]; then
-            cat > "$CFG" << 'SEED'
-          [gateway]
-          port = 42617
-          host = "[::]"
-          require_pairing = true
-          allow_public_bind = true
-
-          [mcp]
-          enabled = true
-
-          [[mcp.servers]]
-          name = "che"
-          transport = "http"
-          url = "http://che-mcp-server:8080/mcp"
-          SEED
-          else
-            sed -i 's/^host = .*/host = "[::]"/' "$CFG"
-            sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' "$CFG"
+            zeroclaw daemon &
+            PID=$!
+            while [ ! -f "$CFG" ]; do sleep 0.2; done
+            kill $PID 2>/dev/null; wait $PID 2>/dev/null
+          fi
+          sed -i 's/^host = .*/host = "[::]"/' "$CFG"
+          sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' "$CFG"
+          if ! grep -q '\[mcp\]' "$CFG"; then
+            printf '\n[mcp]\nenabled = true\n\n[[mcp.servers]]\nname = "che"\ntransport = "http"\nurl = "http://che-mcp-server:8080/mcp"\n' >> "$CFG"
           fi
           /ttyd-vol/ttyd -W bash &
           exec zeroclaw daemon
