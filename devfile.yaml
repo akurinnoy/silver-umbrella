@@ -64,9 +64,8 @@ components:
   # Users interact via the browser terminal — run `zeroclaw onboard` to
   # configure, then use Dashboard restart to apply changes to the daemon.
   #
-  # On first boot, the daemon runs briefly to generate its default
-  # config, then is stopped so the startup script can patch gateway
-  # and MCP settings before the final start.
+  # The --host flag ensures the gateway binds to all interfaces.
+  # Config is managed via `zeroclaw onboard` and persists in the PVC.
   - name: zeroclaw
     container:
       image: quay.io/okurinny/zeroclaw-full:v0.1.7
@@ -77,20 +76,8 @@ components:
       args:
         - |
           mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace
-          CFG=/zeroclaw-data/.zeroclaw/config.toml
-          if [ ! -f "$CFG" ]; then
-            zeroclaw daemon &
-            PID=$!
-            while [ ! -f "$CFG" ]; do sleep 0.2; done
-            kill $PID 2>/dev/null; wait $PID 2>/dev/null
-          fi
-          sed -i 's/^host = .*/host = "[::]"/' "$CFG"
-          sed -i 's/^allow_public_bind = .*/allow_public_bind = true/' "$CFG"
-          if ! grep -q '\[mcp\]' "$CFG"; then
-            printf '\n[mcp]\nenabled = true\n\n[[mcp.servers]]\nname = "che"\ntransport = "http"\nurl = "http://che-mcp-server:8080/mcp"\n' >> "$CFG"
-          fi
           /ttyd-vol/ttyd -W bash &
-          exec zeroclaw daemon
+          exec zeroclaw daemon --host '[::]'
       endpoints:
         - name: gateway
           targetPort: 42617
